@@ -16,7 +16,7 @@ local Functions = {
 	Window = {
 		Create = function(Title, IntroText, IntroIcon, CloseFunc)
 			return Library:MakeWindow({
-				Name = Title, 
+				Name = Title,
 				HidePremium = true,
 				IntroEnabled = type(IntroText) == "string",
 				IntroText = IntroText,
@@ -113,17 +113,22 @@ local Functions = {
 
 local Title = "Nik's Fucked"
 local Main = Functions.Window.Create(Title, Title, "rbxassetid://11457860756", function()
-	print("Closed")
+	pAllButton:Set(false)
 end)
 local Tab = Functions.Tab.Create(Main, "Player")
 Functions.Tab.CreateSection(Tab, "Functions")
-Functions.Tab.CreateToggle(Tab, "Purchase All", false, function(Value)
-	_G.Looping = Value
-end, "all")
-Library:Init()
+pAllButton = nil task.spawn(function() 
+	pAllButton = Functions.Tab.CreateToggle(Tab, "Purchase All", false, function(Value)
+		_G.Global.Looping = Value
+	end, "all") 
+end)
+Functions.Tab.CreateSection(Tab, "Purchase Item")
 
 --// Nik's fucked [WIP]
-_G.Looping = Functions.GetTagged("all")
+_G.Global = {
+	Looping = Functions.GetTagged("all")
+}
+
 local Remotes = {
 	Bundle = game:GetService("ReplicatedStorage").Remotes.Shop.BuyBundle,
 	Item = game:GetService("ReplicatedStorage").Remotes.Shop.BuyItem,
@@ -198,19 +203,62 @@ local ItemLoop = {
 	GetType("NeoLuger", "I", "C"),
 	GetType("Snow", "I", "G"),
 }
+ButtonEnabled = true
+local Quantity = 1
+local ItemTypes, ItemTypes2 = {}, {}
+for _, ItemInfo in pairs(ItemLoop) do
+	local Ti = tick()
+	local Remote = Remotes.Bundle
+	if ItemInfo[2] then
+		Remote = ItemInfo[2] == "Weapons" and Remotes.Item or Remotes.Crate
+	end
+	ItemTypes[ItemInfo[1]] = {Remote, ItemInfo}
+	table.insert(ItemTypes2, ItemInfo[1])
+	task.wait(tick() - Ti)
+end
+currentItemType = ItemTypes[ItemTypes2[1]]
+Functions.Tab.CreateDropDown(Tab, "Items", currentItemType[2][1], ItemTypes2, function(Item)
+	currentItemType = ItemTypes[Item]
+	if ItemLabel then
+		ItemLabel:Set("Currency: ".. currentItemType[2][3] .." Price: ".. tostring(currentItemType[2][3] == "Key" and 1*Quantity or "Free"))
+	end
+end)
+ItemLabel = Functions.Tab.CreateLabel(Tab, "Currency: ".. currentItemType[2][3] .." Price: ".. tostring(currentItemType[2][3] == "Key" and 1*Quantity or "Free"))
+Functions.Tab.CreateSlider(Tab, "Quantity", 1, 420, 1, Quantity, Color3.fromRGB(85, 85, 127), nil, function(Value)
+	Quantity = Value
+	if ItemLabel then
+		ItemLabel:Set("Currency: ".. currentItemType[2][3] ..", Price: ".. tostring(currentItemType[2][3] == "Key" and 1*Quantity or "Free"))
+	end
+end)
+
+Functions.Tab.CreateButton(Tab, "Purchase", function()
+	if currentItemType and ButtonEnabled then
+		ButtonEnabled = false
+		local ItemInfo = currentItemType[2]
+		for _ = 1, Quantity do
+			currentItemType[1]:InvokeServer(table.unpack(ItemInfo)) 
+		end
+		Functions.SendNotification("! Notice !", "You've Purchased [".. tostring(Quantity) .."]: ".. ItemInfo[1].. (Quantity > 1 and "'s" or ""), nil, 2)
+		ButtonEnabled = true
+	elseif not ButtonEnabled then
+		Functions.SendNotification("! Warning !", "In Process Of Purchase", nil, 2)
+	end
+end)
+repeat task.wait() until pAllButton
+Library:Init()
 while task.wait() do
 	local Count, Max = 0, 1
 	task.spawn(function()
-		if _G.Looping then
+		if 	_G.Global.Looping then
 			for _, ItemInfo in pairs(ItemLoop) do
-				if not _G.Looping then break end
+				if not 	_G.Global.Looping then break end
 				local Ti = tick()
 				local Remote = Remotes.Bundle
 				if ItemInfo[2] then
 					Remote = ItemInfo[2] == "Weapons" and Remotes.Item or Remotes.Crate
 					Remote:InvokeServer(table.unpack(ItemInfo))
 				else
-					Remote:InvokeServer(table.unpack(ItemInfo))   
+					Remote:InvokeServer(table.unpack(ItemInfo))
 				end
 				task.wait(tick() - Ti)
 			end
